@@ -42,7 +42,7 @@ def main() -> None:
             logger.warning(f"Failed to get balance from OKX API, using default: 10000")
             starting_cash = 10000.0
         else:
-            logger.info(f"Using real balance from OKX: {starting_cash:.2f} {currency}")
+            logger.info(f"Using real balance from OKX: {starting_cash:.4f} {currency}")
     
     broker = PaperBroker(starting_cash=starting_cash)
     risk = RiskManager(max_notional_per_order=float(os.getenv("PAPER_MAX_NOTIONAL", "200")))
@@ -51,7 +51,7 @@ def main() -> None:
         short_window=int(os.getenv("SMA_SHORT", "50")),
         long_window=int(os.getenv("SMA_LONG", "200")),
         quote_per_trade=float(os.getenv("SMA_QUOTE_PER_TRADE", "50")),
-        min_cross_diff_pct=float(os.getenv("SMA_MIN_CROSS_DIFF_PCT", "0.5")),
+        min_cross_diff_pct=float(os.getenv("SMA_MIN_CROSS_DIFF_PCT", "0.01")),
         cooldown_seconds=int(os.getenv("SMA_COOLDOWN_SECONDS", "5")),
     )
     strat = SmaCrossStrategy(inst_ids=inst_ids, cfg=sma_cfg)

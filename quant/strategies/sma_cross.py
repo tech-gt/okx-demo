@@ -30,7 +30,7 @@ class SmaCrossStrategy(Strategy):
         self._logger = logging.getLogger(__name__)
 
     def on_start(self) -> None:
-        self._logger.info("Strategy started (SMA cross)")
+        self._logger.info(f"Strategy started (SMA cross) - Config: short={self._cfg.short_window}, long={self._cfg.long_window}, min_diff={self._cfg.min_cross_diff_pct}%, cooldown={self._cfg.cooldown_seconds}s")
 
     def _avg(self, d: Deque[float]) -> float:
         return sum(d) / len(d) if d else 0.0
@@ -49,7 +49,7 @@ class SmaCrossStrategy(Strategy):
         long_len = len(self._long[tick.inst_id])
         
         if short_len < self._cfg.short_window or long_len < self._cfg.long_window:
-            self._logger.info(f"{tick.inst_id} Price={tick.last:.6f} Warming up (short={short_len}/{self._cfg.short_window}, long={long_len}/{self._cfg.long_window})")
+            self._logger.info(f"{tick.inst_id} Price={tick.last:.4f} Warming up (short={short_len}/{self._cfg.short_window}, long={long_len}/{self._cfg.long_window})")
             return []
 
         was_above = self._above[tick.inst_id]
@@ -58,7 +58,7 @@ class SmaCrossStrategy(Strategy):
 
         diff_pct = abs(s - l) / l * 100 if l > 0 else 0
         
-        self._logger.info(f"{tick.inst_id} Price={tick.last:.2f} SMA(short={self._cfg.short_window})={s:.2f} SMA(long={self._cfg.long_window})={l:.2f} Above={was_above}->{now_above} Diff={diff_pct:.3f}%")
+        self._logger.info(f"{tick.inst_id} Price={tick.last:.4f} SMA(short={self._cfg.short_window})={s:.4f} SMA(long={self._cfg.long_window})={l:.4f} Above={was_above}->{now_above} Diff={diff_pct:.4f}%")
 
         # Check cooldown period
         now = time.time()
@@ -72,7 +72,7 @@ class SmaCrossStrategy(Strategy):
         if not was_above and now_above:
             # Check minimum difference to avoid whipsaw
             if diff_pct < self._cfg.min_cross_diff_pct:
-                self._logger.info(f"{tick.inst_id} Golden cross diff {diff_pct:.3f}% < min {self._cfg.min_cross_diff_pct:.3f}%, skipping")
+                self._logger.info(f"{tick.inst_id} Golden cross diff {diff_pct:.4f}% < min {self._cfg.min_cross_diff_pct:.4f}%, skipping")
                 return []
             
             self._logger.info(f"GOLDEN CROSS detected on {tick.inst_id}, generating BUY order")
@@ -89,7 +89,7 @@ class SmaCrossStrategy(Strategy):
         if was_above and not now_above:
             # Check minimum difference to avoid whipsaw
             if diff_pct < self._cfg.min_cross_diff_pct:
-                self._logger.info(f"{tick.inst_id} Death cross diff {diff_pct:.3f}% < min {self._cfg.min_cross_diff_pct:.3f}%, skipping")
+                self._logger.info(f"{tick.inst_id} Death cross diff {diff_pct:.4f}% < min {self._cfg.min_cross_diff_pct:.4f}%, skipping")
                 return []
             
             self._logger.info(f"DEATH CROSS detected on {tick.inst_id}, generating SELL order")

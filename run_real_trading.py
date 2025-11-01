@@ -55,7 +55,7 @@ def main() -> None:
         short_window=int(os.getenv("SMA_SHORT", "5")),
         long_window=int(os.getenv("SMA_LONG", "20")),
         quote_per_trade=float(os.getenv("SMA_QUOTE_PER_TRADE", "50")),
-        min_cross_diff_pct=float(os.getenv("SMA_MIN_CROSS_DIFF_PCT", "0.5")),
+        min_cross_diff_pct=float(os.getenv("SMA_MIN_CROSS_DIFF_PCT", "0.01")),
         cooldown_seconds=int(os.getenv("SMA_COOLDOWN_SECONDS", "300")),
     )
     strat = SmaCrossStrategy(inst_ids=inst_ids, cfg=sma_cfg)

@@ -34,7 +34,7 @@ class PaperEngine:
         latest_prices: dict[str, float] = {}  # Track latest prices for each instrument
         try:
             for tick in self._feed.stream():
-                self._logger.info(f"Tick #{tick_count + 1} {tick.inst_id} Price={tick.last:.6f}")
+                self._logger.info(f"Tick #{tick_count + 1} {tick.inst_id} Price={tick.last:.4f}")
                 latest_prices[tick.inst_id] = tick.last
                 
                 if hasattr(self._broker, "set_last_price"):
@@ -57,7 +57,7 @@ class PaperEngine:
                     
                     if self._dry_run:
                         self._logger.info(f"[DryRun] Would submit order: {order.side} {order.inst_id} quote_quantity={order.quote_quantity}")
-                        self._logger.info(f"[DryRun] Reference price: {ref_price:.2f}")
+                        self._logger.info(f"[DryRun] Reference price: {ref_price:.4f}")
                         if order.quote_quantity:
                             qty = order.quote_quantity / ref_price
                             notional = order.quote_quantity
@@ -65,13 +65,13 @@ class PaperEngine:
                             qty = order.quantity
                             notional = qty * ref_price
                         fee = notional * (5.0 / 10_000.0)  # 5bps fee
-                        self._logger.info(f"[DryRun] Would fill: quantity={qty:.6f} notional={notional:.2f} fee={fee:.2f}")
+                        self._logger.info(f"[DryRun] Would fill: quantity={qty:.4f} notional={notional:.4f} fee={fee:.4f}")
                     else:
                         fills = self._broker.submit(order)
                         if fills:
                             self._logger.info(f"Fills: {fills}")
                             portfolio = self._broker.get_portfolio()
-                            self._logger.info(f"Cash={portfolio.cash:.2f} Positions={len(portfolio.positions)}")
+                            self._logger.info(f"Cash={portfolio.cash:.4f} Positions={len(portfolio.positions)}")
 
                 # Check position value limit
                 if self._max_position_value is not None:
@@ -83,7 +83,7 @@ class PaperEngine:
                             total_position_value += pos.quantity * latest_price
                     
                     if total_position_value >= self._max_position_value:
-                        self._logger.info(f"Total position value {total_position_value:.2f} reached limit {self._max_position_value:.2f}, stopping...")
+                        self._logger.info(f"Total position value {total_position_value:.4f} reached limit {self._max_position_value:.4f}, stopping...")
                         break
                 
                 # tick_count += 1
@@ -108,8 +108,8 @@ class PaperEngine:
             
             self._logger.info("Final portfolio state:")
             portfolio = self._broker.get_portfolio()
-            self._logger.info(f"Cash={portfolio.cash:.2f}")
+            self._logger.info(f"Cash={portfolio.cash:.4f}")
             for inst_id, pos in portfolio.positions.items():
-                self._logger.info(f"{inst_id}: qty={pos.quantity:.6f} avg_price={pos.avg_price:.2f}")
+                self._logger.info(f"{inst_id}: qty={pos.quantity:.4f} avg_price={pos.avg_price:.4f}")
 
 
