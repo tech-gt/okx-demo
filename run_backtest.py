@@ -35,8 +35,8 @@ def main() -> None:
     risk = RiskManager(max_notional_per_order=float(os.getenv("BT_MAX_NOTIONAL", "1e9")))
 
     sma_cfg = SmaConfig(
-        short_window=int(os.getenv("BT_SMA_SHORT", "5")),
-        long_window=int(os.getenv("BT_SMA_LONG", "20")),
+        short_window=int(os.getenv("BT_SMA_SHORT", "50")),
+        long_window=int(os.getenv("BT_SMA_LONG", "200")),
         quote_per_trade=float(os.getenv("BT_QUOTE_PER_TRADE", "50")),
         min_cross_diff_pct=float(os.getenv("BT_MIN_CROSS_DIFF_PCT", "0.01")),
         cooldown_seconds=int(os.getenv("BT_COOLDOWN_SECONDS", "300")),

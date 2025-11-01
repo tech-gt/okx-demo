@@ -8,6 +8,7 @@ import hmac
 import hashlib
 import base64
 import json
+from typing import List
 from urllib.parse import urlencode
 
 import requests
@@ -134,4 +135,86 @@ def get_okx_cash_balance(currency: str = 'USDT') -> float:
         logger.warning(f"Failed to parse balance response: {e}")
     
     return 0.0
+
+
+def get_funding_rate(inst_id: str) -> float | None:
+    """Get current funding rate for a swap/perp instrument.
+    
+    Args:
+        inst_id: Instrument ID (e.g., 'BTC-USDT-SWAP')
+        
+    Returns:
+        Current funding rate as float (e.g., 0.0001 for 0.01%), or None on error
+        
+    Example:
+        >>> rate = get_funding_rate('BTC-USDT-SWAP')
+        >>> if rate and rate > 0.0001:  # > 0.01%
+        >>>     print(f"High funding rate: {rate*100:.4f}%")
+    """
+    result = _okx_request('GET', '/api/v5/public/funding-rate', params={'instId': inst_id})
+    
+    if result.get('code') != '0':
+        logger = get_logger(__name__)
+        logger.warning(f"Failed to get funding rate for {inst_id}: {result.get('msg', 'Unknown error')}")
+        return None
+    
+    data_list = result.get('data', [])
+    if not data_list:
+        return None
+    
+    try:
+        funding_rate_str = data_list[0].get('fundingRate', '0')
+        return float(funding_rate_str)
+    except (KeyError, ValueError, TypeError) as e:
+        logger = get_logger(__name__)
+        logger.warning(f"Failed to parse funding rate response: {e}")
+        return None
+
+
+def list_swap_instruments(quote_ccy: str = 'USDT') -> List[str]:
+    """List all swap instruments for a given quote currency.
+    
+    Args:
+        quote_ccy: Quote currency (e.g., 'USDT', 'USDC')
+        
+    Returns:
+        List of instrument IDs (e.g., ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', ...])
+    """
+    
+    result = _okx_request('GET', '/api/v5/public/instruments', 
+                          params={'instType': 'SWAP', 'quoteCcy': quote_ccy})
+    
+    if result.get('code') != '0':
+        logger = get_logger(__name__)
+        logger.warning(f"Failed to list swap instruments: {result.get('msg', 'Unknown error')}")
+        return []
+    
+    data_list = result.get('data', [])
+    inst_ids = []
+    for item in data_list:
+        inst_id = item.get('instId')
+        if inst_id:
+            inst_ids.append(inst_id)
+    
+    return inst_ids
+
+
+def get_funding_rates_for_all(quote_ccy: str = 'USDT') -> dict[str, float]:
+    """Get funding rates for all swap instruments.
+    
+    Args:
+        quote_ccy: Quote currency (e.g., 'USDT')
+        
+    Returns:
+        Dictionary mapping inst_id to funding rate (e.g., {'BTC-USDT-SWAP': 0.0001, ...})
+    """
+    inst_ids = list_swap_instruments(quote_ccy)
+    rates: dict[str, float] = {}
+    
+    for inst_id in inst_ids:
+        rate = get_funding_rate(inst_id)
+        if rate is not None:
+            rates[inst_id] = rate
+    
+    return rates
 

@@ -103,7 +103,10 @@ class OkxBroker(Broker):
         return portfolio
 
     def _convert_order(self, order: Order) -> Optional[dict]:
-        """Convert internal Order to OKX API format."""
+        """Convert internal Order to OKX API format.
+        
+        Supports both spot (e.g., BTC-USDT) and swap (e.g., BTC-USDT-SWAP) instruments.
+        """
         side = 'buy' if order.side == Side.BUY else 'sell'
         ord_type = 'market' if order.order_type == OrderType.MARKET else 'limit'
         
@@ -111,26 +114,49 @@ class OkxBroker(Broker):
             self._logger.error("Limit order requires price")
             return None
 
+        # Detect instrument type from inst_id
+        is_swap = '-SWAP' in order.inst_id or '-PERP' in order.inst_id.upper()
+        
         okx_order = {
             'instId': order.inst_id,
-            'tdMode': 'cash',  # Spot trading
             'side': side,
             'ordType': ord_type,
         }
 
-        # OKX uses 'sz' for size
-        # For spot market, we can specify quote currency or base currency
-        if order.quote_quantity is not None and order.quote_quantity > 0:
-            # Specify by quote currency (e.g., spend 50 USDT)
-            okx_order['sz'] = str(order.quote_quantity)
-            okx_order['tgtCcy'] = 'quote_ccy'
-        elif order.quantity > 0:
-            # Specify by base currency (e.g., buy 0.1 BTC)
-            okx_order['sz'] = str(order.quantity)
-            okx_order['tgtCcy'] = 'base_ccy'
+        if is_swap:
+            # For swap contracts, use isolated margin mode
+            okx_order['tdMode'] = 'isolated'  # Can be changed to 'cross' if needed
+            # Swap contracts use contract size (not quote/base currency)
+            # We need to specify contract quantity
+            if order.quantity > 0:
+                okx_order['sz'] = str(order.quantity)
+            elif order.quote_quantity is not None and order.quote_quantity > 0:
+                # If quote_quantity is provided for swap, we need current price to convert
+                # For now, log warning and use quantity
+                self._logger.warning(f"Swap order with quote_quantity: {order.quote_quantity}, using quantity instead")
+                if order.quantity <= 0:
+                    self._logger.error("Swap order must have quantity > 0")
+                    return None
+                okx_order['sz'] = str(order.quantity)
+            else:
+                self._logger.error("Swap order must have quantity > 0")
+                return None
         else:
-            self._logger.error("Order must have either quantity or quote_quantity")
-            return None
+            # For spot trading
+            okx_order['tdMode'] = 'cash'
+            # OKX uses 'sz' for size
+            # For spot market, we can specify quote currency or base currency
+            if order.quote_quantity is not None and order.quote_quantity > 0:
+                # Specify by quote currency (e.g., spend 50 USDT)
+                okx_order['sz'] = str(order.quote_quantity)
+                okx_order['tgtCcy'] = 'quote_ccy'
+            elif order.quantity > 0:
+                # Specify by base currency (e.g., buy 0.1 BTC)
+                okx_order['sz'] = str(order.quantity)
+                okx_order['tgtCcy'] = 'base_ccy'
+            else:
+                self._logger.error("Spot order must have either quantity or quote_quantity")
+                return None
 
         if order.price:
             okx_order['px'] = str(order.price)
