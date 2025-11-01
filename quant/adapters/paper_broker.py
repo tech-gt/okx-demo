@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import List, Optional
 
@@ -41,6 +42,9 @@ class PaperBroker(Broker):
             qty = max(0.0, float(order.quantity))
         if qty == 0:
             return []
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"Filling order at price={px:.5f} for {order.inst_id} (explicit={order.price}, last_price={self._last_price.get(order.inst_id)})")
 
         ts = int(time.time() * 1000)
         fee = (px * qty) * (self._fee_bps / 10_000.0)
