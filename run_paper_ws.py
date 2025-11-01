@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import logging
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+from quant.adapters.okx_ws_feed import OkxWsTickerFeed
+from quant.adapters.paper_broker import PaperBroker
+from quant.core.risk import RiskManager
+from quant.engines.paper_loop import PaperEngine
+from quant.strategies.sma_cross import SmaCrossStrategy, SmaConfig
+from quant.utils import setup_logging, get_okx_cash_balance
+
+
+def main() -> None:
+    setup_logging()
+    logger = logging.getLogger(__name__)
+    
+    inst_ids = os.getenv("OKX_PAPER_INST_IDS", "BTC-USDT").split(",")
+    inst_ids = [i.strip() for i in inst_ids if i.strip()]
+    duration_ticks_env = os.getenv("OKX_PAPER_TICKS", "200")
+    duration_ticks = int(duration_ticks_env) if duration_ticks_env else None
+    
+    # Enable dry run mode via environment variable
+    dry_run = os.getenv("PAPER_DRY_RUN", "false").lower() in ("true", "1", "yes")
+
+    # Use WebSocket feed for real-time data
+    feed = OkxWsTickerFeed(inst_ids=inst_ids)
+    
+    # Get starting cash: prefer OKX API if PAPER_USE_REAL_BALANCE is set
+    starting_cash = float(os.getenv("PAPER_START_CASH", "10000"))
+    if os.getenv("PAPER_USE_REAL_BALANCE", "yes").lower() in ("true", "1", "yes"):
+        currency = os.getenv("PAPER_BALANCE_CURRENCY", "USDT")
+        starting_cash = get_okx_cash_balance(currency)
+        if starting_cash == 0.0:
+            logger.warning(f"Failed to get balance from OKX API, using default: 10000")
+            starting_cash = 10000.0
+        else:
+            logger.info(f"Using real balance from OKX: {starting_cash:.2f} {currency}")
+    
+    broker = PaperBroker(starting_cash=starting_cash)
+    risk = RiskManager(max_notional_per_order=float(os.getenv("PAPER_MAX_NOTIONAL", "200")))
+
+    sma_cfg = SmaConfig(
+        short_window=int(os.getenv("SMA_SHORT", "5")),
+        long_window=int(os.getenv("SMA_LONG", "20")),
+        quote_per_trade=float(os.getenv("SMA_QUOTE_PER_TRADE", "50")),
+    )
+    strat = SmaCrossStrategy(inst_ids=inst_ids, cfg=sma_cfg)
+
+    engine = PaperEngine(strategy=strat, feed=feed, broker=broker, risk=risk, dry_run=dry_run)
+    mode_str = "[DRY RUN]" if dry_run else "[LIVE]"
+    logger.info(f"Starting paper engine with WebSocket feed {mode_str}: {inst_ids}")
+    engine.run(duration_ticks=duration_ticks)
+
+
+if __name__ == "__main__":
+    main()

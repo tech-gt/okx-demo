@@ -24,6 +24,83 @@ python3 -m pip install -r requirements.txt
 python3 okx_demo.py
 ```
 
+## 量化系统框架（Python，模拟盘/回测）
+
+目录 `quant/` 提供可扩展架构，支持不同策略与不同产品（先从 SPOT/行情 Tick 开始）：
+
+- 核心模块：`quant/core/`
+  - `types.py` 定义 `Tick`/`Order`/`Fill`/`PortfolioState` 等通用数据结构
+  - `strategy.py` 策略基类（`on_start/on_tick/on_end`）
+  - `datafeed.py` 行情源抽象
+  - `broker.py` 交易通道抽象
+  - `portfolio.py` 组合持仓与资金变更逻辑
+  - `risk.py` 简单风控（单笔名义金额等）
+- 适配层：`quant/adapters/`
+  - `okx_rest_feed.py` 基于 OKX REST 的简易轮询行情源（模拟盘友好）
+  - `okx_ws_feed.py` 基于 OKX WebSocket 的实时行情源（低延迟）
+  - `paper_broker.py` 简单模拟撮合，按最新价即时成交（含费率）
+  - `csv_feed.py` 用于回测的 CSV Tick 源（列：`ts,last[,bid,ask]`）
+- 引擎：`quant/engines/`
+  - `paper_loop.py` 事件循环（策略 -> 风控 -> 模拟撮合 -> 组合）
+- 策略示例：`quant/strategies/sma_cross.py`（SMA 金叉/死叉，按报价币下单）
+
+### 运行模拟盘
+
+有两种方式运行模拟盘：
+
+**方式1：REST 轮询行情（更简单，适合测试）**
+
+```
+python3 run_paper.py
+```
+
+**方式2：WebSocket 实时行情（低延迟，推荐用于生产）**
+
+```
+python3 run_paper_ws.py
+```
+
+可选环境变量：
+- `OKX_PAPER_INST_IDS`（默认 `BTC-USDT`，多品种逗号分隔）
+- `OKX_PAPER_INTERVAL`（仅 REST 模式，默认 `1.0` 秒）
+- `OKX_WS_PUBLIC_URL`（仅 WS 模式，默认 `wss://ws.okx.com:8443/ws/v5/public`）
+- `PAPER_START_CASH`（默认 `10000`，初始模拟资金）
+- `PAPER_USE_REAL_BALANCE`（设置为 `true`/`1`/`yes` 从 OKX API 获取真实余额作为初始资金）
+- `PAPER_BALANCE_CURRENCY`（查询余额的币种，默认 `USDT`，需配合 `PAPER_USE_REAL_BALANCE` 使用）
+- `PAPER_MAX_NOTIONAL`（单笔上限，默认 `200`）
+- `SMA_SHORT`/`SMA_LONG`（默认 `5/20`）
+- `SMA_QUOTE_PER_TRADE`（每次下单的报价币金额，默认 `50`）
+- `PAPER_DRY_RUN`（设置为 `true`/`1`/`yes` 启用干跑模式，只输出日志不实际下单）
+- `OKX_PAPER_TICKS`（运行多少 tick 后停止，默认 `200`）
+
+**重要**：设置 `PAPER_DRY_RUN=true` 可以查看策略逻辑和运行流程，但不会实际下单和修改资金。
+
+**从 OKX 获取初始资金**：
+如果你想使用 OKX 账户的真实余额作为模拟盘初始资金，设置 `PAPER_USE_REAL_BALANCE=true` 并配置 `PAPER_BALANCE_CURRENCY=USDT`（或其他币种）。如果 API 查询失败，将回退到 `PAPER_START_CASH` 的默认值。
+
+### 运行回测（CSV Tick）
+
+```
+python3 run_backtest.py <csv_path> <inst_id>
+```
+
+例如：
+
+```
+python3 run_backtest.py data/btc_usdt_ticks.csv BTC-USDT
+```
+
+环境变量：
+- `BT_START_CASH`（默认 `10000`）
+- `BT_MAX_NOTIONAL`（默认 `1e9`，基本不限制）
+- `BT_SMA_SHORT`/`BT_SMA_LONG`/`BT_QUOTE_PER_TRADE`
+
+### 架构扩展点
+
+- 新策略：实现 `Strategy`，在 `on_tick` 输出 `Order`
+- 新产品：扩展 `Instrument`/下单规则，在 `Broker` 侧处理
+- 实盘接入：用 OKX 私有 WS/REST 替换 `PaperBroker`，保留相同 `Broker` 接口
+
 运行后脚本会：
 - 查询服务器时间（`/api/v5/public/time`）
 - 查询账户余额（`/api/v5/account/balance`，默认查询 USDT）
