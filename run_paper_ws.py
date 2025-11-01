@@ -13,7 +13,7 @@ except Exception:
 from quant.adapters.okx_ws_feed import OkxWsTickerFeed
 from quant.adapters.paper_broker import PaperBroker
 from quant.core.risk import RiskManager
-from quant.engines.paper_loop import PaperEngine
+from quant.engines.trading_loop import TradingEngine
 from quant.strategies.sma_cross import SmaCrossStrategy, SmaConfig
 from quant.utils import setup_logging, get_okx_cash_balance
 
@@ -60,7 +60,7 @@ def main() -> None:
     max_pos_val_str = os.getenv("MAX_POSITION_VALUE")
     max_position_value = float(max_pos_val_str) if max_pos_val_str else None
     
-    engine = PaperEngine(strategy=strat, feed=feed, broker=broker, risk=risk, dry_run=dry_run, 
+    engine = TradingEngine(strategy=strat, feed=feed, broker=broker, risk=risk, dry_run=dry_run, 
                          max_position_value=max_position_value)
     
     mode_str = "[DRY RUN]" if dry_run else "[LIVE]"

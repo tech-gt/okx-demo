@@ -90,7 +90,15 @@ class FundingArbitrageStrategy(Strategy):
         return self._broker.get_portfolio()
     
     def _has_open_position(self) -> bool:
-        """Check if we have an open arbitrage position."""
+        """Check if we have an open arbitrage position.
+        
+        An arbitrage position requires:
+        - Spot long position (positive quantity) AND
+        - Swap short position (negative quantity)
+        
+        If user already has spot but no swap, we can still open arbitrage,
+        so we check if we have a swap short position as the key indicator.
+        """
         portfolio = self._get_portfolio()
         if portfolio is None:
             return False
@@ -98,10 +106,13 @@ class FundingArbitrageStrategy(Strategy):
         spot_pos = portfolio.positions.get(self._cfg.spot_inst_id)
         swap_pos = portfolio.positions.get(self._cfg.swap_inst_id)
         
-        has_spot = spot_pos is not None and abs(spot_pos.quantity) > 1e-8
-        has_swap = swap_pos is not None and abs(swap_pos.quantity) > 1e-8
+        # Check if we have a swap short position (negative quantity)
+        # This is the key indicator of an active arbitrage position
+        has_swap_short = swap_pos is not None and swap_pos.quantity < -1e-8
         
-        return has_spot or has_swap
+        # If we have swap short, we have an arbitrage position
+        # (spot might be pre-existing or bought by strategy)
+        return has_swap_short
     
     def _get_position_sizes(self) -> Tuple[float, float]:
         """Get current position sizes: (spot_qty, swap_qty)."""
@@ -158,37 +169,60 @@ class FundingArbitrageStrategy(Strategy):
                     f"{self._cfg.min_funding_rate*100:.4f}%, opening arbitrage position"
                 )
                 
-                # Calculate position size
+                # Calculate target position size
                 # Use average of spot and swap prices for better accuracy
                 avg_price = (self._last_spot_price + self._last_swap_price) / 2.0
-                position_qty = self._calculate_position_size(avg_price)
+                target_position_qty = self._calculate_position_size(avg_price)
                 
-                if position_qty <= 0:
-                    self._logger.error(f"Invalid position quantity: {position_qty}")
+                if target_position_qty <= 0:
+                    self._logger.error(f"Invalid position quantity: {target_position_qty}")
                     return []
                 
+                # Check existing spot balance
+                spot_qty, swap_qty = self._get_position_sizes()
+                available_spot = spot_qty  # Use existing spot position quantity
+                
+                # Calculate how much spot we need to buy (if any)
+                spot_to_buy = max(0.0, target_position_qty - available_spot)
+                
+                # Calculate swap position size
+                # For arbitrage, swap should match total (existing + new) spot
+                swap_position_qty = target_position_qty
+                
                 self._logger.info(
-                    f"Opening position: Spot long {position_qty:.6f} {self._cfg.spot_inst_id}, "
-                    f"Swap short {position_qty:.6f} {self._cfg.swap_inst_id}"
+                    f"Target position: {target_position_qty:.6f}"
+                )
+                self._logger.info(
+                    f"Existing spot: {available_spot:.6f}, Need to buy: {spot_to_buy:.6f}"
+                )
+                self._logger.info(
+                    f"Opening arbitrage: Spot long {target_position_qty:.6f} {self._cfg.spot_inst_id} "
+                    f"(using {available_spot:.6f} existing + buying {spot_to_buy:.6f}), "
+                    f"Swap short {swap_position_qty:.6f} {self._cfg.swap_inst_id}"
                 )
                 
-                # Open spot long position
-                orders.append(Order(
-                    inst_id=self._cfg.spot_inst_id,
-                    side=Side.BUY,
-                    order_type=OrderType.MARKET,
-                    quantity=position_qty,
-                    quote_quantity=None,
-                ))
+                # Buy spot only if we need more (use existing if available)
+                if spot_to_buy > 1e-8:  # Need to buy some spot
+                    orders.append(Order(
+                        inst_id=self._cfg.spot_inst_id,
+                        side=Side.BUY,
+                        order_type=OrderType.MARKET,
+                        quantity=spot_to_buy,
+                        quote_quantity=None,
+                    ))
+                    self._logger.info(f"Buying {spot_to_buy:.6f} {self._cfg.spot_inst_id} spot")
+                else:
+                    self._logger.info(f"Using existing {available_spot:.6f} {self._cfg.spot_inst_id} spot, no need to buy")
                 
-                # Open swap short position
+                # Always open swap short position
                 orders.append(Order(
                     inst_id=self._cfg.swap_inst_id,
                     side=Side.SELL,
                     order_type=OrderType.MARKET,
-                    quantity=position_qty,
+                    quantity=swap_position_qty,
                     quote_quantity=None,
                 ))
+                self._logger.info(f"Shorting {swap_position_qty:.6f} {self._cfg.swap_inst_id} swap")
         else:
             # Have position - check if we should close
             if funding_rate <= self._cfg.max_funding_rate_to_close:

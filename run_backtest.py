@@ -14,7 +14,7 @@ except Exception:
 from quant.adapters.csv_feed import CsvTickFeed
 from quant.adapters.paper_broker import PaperBroker
 from quant.core.risk import RiskManager
-from quant.engines.paper_loop import PaperEngine
+from quant.engines.trading_loop import TradingEngine
 from quant.strategies.sma_cross import SmaCrossStrategy, SmaConfig
 from quant.utils import setup_logging
 
@@ -43,7 +43,7 @@ def main() -> None:
     )
     strat = SmaCrossStrategy(inst_ids=[inst_id], cfg=sma_cfg)
 
-    engine = PaperEngine(strategy=strat, feed=feed, broker=broker, risk=risk)
+    engine = TradingEngine(strategy=strat, feed=feed, broker=broker, risk=risk)
     logger.info(f"Starting backtest for: {inst_id}")
     engine.run(duration_ticks=None)
     logger.info(f"Final portfolio: {broker.get_portfolio()}")

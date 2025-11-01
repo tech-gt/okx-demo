@@ -11,12 +11,12 @@ from ..core.broker import Broker
 
 
 @dataclass
-class PaperEngineConfig:
+class TradingEngineConfig:
     inst_ids: List[str]
     dry_run: bool = False  # If True, only log but do not submit orders
 
 
-class PaperEngine:
+class TradingEngine:
     def __init__(self, strategy: Strategy, feed, broker: Broker, risk: RiskManager, dry_run: bool = False, 
                  max_position_value: float | None = None) -> None:
         self._strategy = strategy
@@ -111,5 +111,4 @@ class PaperEngine:
             self._logger.info(f"Cash={portfolio.cash:.4f}")
             for inst_id, pos in portfolio.positions.items():
                 self._logger.info(f"{inst_id}: qty={pos.quantity:.4f} avg_price={pos.avg_price:.4f}")
-
 

@@ -42,7 +42,7 @@ python3 okx_demo.py
   - `okx_broker.py` ⭐ **真实 OKX 交易所连接**（支持模拟盘和实盘）
   - `csv_feed.py` 用于回测的 CSV Tick 源（列：`ts,last[,bid,ask]`）
 - 引擎：`quant/engines/`
-  - `paper_loop.py` 事件循环（策略 -> 风控 -> 模拟撮合 -> 组合）
+  - `trading_loop.py` 交易引擎（策略 -> 风控 -> 撮合 -> 组合），支持模拟盘和实盘交易
 - 策略示例：`quant/strategies/sma_cross.py`（SMA 金叉/死叉，按报价币下单）
 
 ### 运行模拟盘
