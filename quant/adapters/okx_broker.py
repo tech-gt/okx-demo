@@ -170,10 +170,15 @@ class OkxBroker(Broker):
                 # Query fills
                 fill_response = _okx_request('GET', '/api/v5/trade/fills', 
                                             params={'ordId': okx_order_id})
-                self._logger.info(f"Fill response: {fill_response}")
                 if fill_response.get('code') == '0':
                     fill_data_list = fill_response.get('data', [])
+                    # Track which fills we've already seen to avoid duplicates
+                    existing_fill_ts = {f.ts for f in fills}
                     for fill_data in fill_data_list:
+                        fill_ts = int(fill_data.get('ts', '0'))
+                        if fill_ts in existing_fill_ts:
+                            continue  # Skip already processed fills
+                        
                         # Convert OKX fill to our Fill format
                         # OKX fee can be negative (maker rebate) or positive (taker fee)
                         # We take absolute value for consistency
@@ -182,7 +187,7 @@ class OkxBroker(Broker):
                         
                         fill = Fill(
                             inst_id=order.inst_id,
-                            ts=int(fill_data.get('ts', '0')),
+                            ts=fill_ts,
                             side=Side.BUY if fill_data.get('side') == 'buy' else Side.SELL,
                             price=float(fill_data.get('fillPx', '0')),
                             quantity=float(fill_data.get('fillSz', '0')),
@@ -191,13 +196,26 @@ class OkxBroker(Broker):
                         )
                         fills.append(fill)
                 
+                # For any filled state (partial or full), return what we got
                 if state == 'filled':
                     self._logger.info(f"Order {okx_order_id} fully filled: {len(fills)} fill(s)")
                     break
+                elif state == 'partially_filled':
+                    # Partial fill - continue polling for more fills
+                    self._logger.info(f"Order {okx_order_id} partially filled: {len(fills)} fill(s)")
+                    time.sleep(0.5)
+                    continue
             
-            elif state in ['canceled', 'live'] and filled_sz == 0:
+            elif state in ['canceled', 'live']:
                 # Order was canceled or not yet executed
-                self._logger.warning(f"Order {okx_order_id} ended with state: {state}")
+                if filled_sz == 0:
+                    self._logger.warning(f"Order {okx_order_id} ended with state: {state}")
+                    break
+                # If order was canceled but has fills, return what we got
+                if fills:
+                    self._logger.info(f"Order {okx_order_id} canceled with {len(fills)} fill(s)")
+                    break
+                self._logger.warning(f"Order {okx_order_id} canceled with no fills")
                 break
 
             time.sleep(0.5)

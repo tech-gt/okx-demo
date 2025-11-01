@@ -71,6 +71,8 @@ python3 run_paper_ws.py
 - `PAPER_MAX_NOTIONAL`（单笔上限，默认 `200`）
 - `SMA_SHORT`/`SMA_LONG`（默认 `5/20`）
 - `SMA_QUOTE_PER_TRADE`（每次下单的报价币金额，默认 `50`）
+- `SMA_MIN_CROSS_DIFF_PCT`（SMA 交叉的最小差值百分比，用于避免假信号，默认 `0.5`）
+- `SMA_COOLDOWN_SECONDS`（每次交易后的冷却时间（秒），避免过度交易，默认 `300`）
 - `PAPER_DRY_RUN`（设置为 `true`/`1`/`yes` 启用干跑模式，只输出日志不实际下单）
 - `OKX_PAPER_TICKS`（运行多少 tick 后停止，默认 `200`）
 
@@ -95,12 +97,15 @@ python3 run_real_trading.py
 环境变量：
 - `OKX_SIMULATED`（默认 `1`，模拟盘；设为 `0` 切换到实盘）
 - `OKX_REAL_INST_IDS`（默认 `DOGE-USDT`，交易品种）
-- `OKX_REAL_TICKS`（默认 `50`，运行多少个 tick）
+- `OKX_REAL_TICKS`（默认 `50`，运行多少个 tick，设为 `None` 或 `0` 持续运行）
 - `OKX_REAL_DRY_RUN`（默认 `false`，设为 `true` 只查看不实际下单）
 - `OKX_REAL_MAX_NOTIONAL`（单笔上限，默认 `200`）
 - `OKX_FILL_WAIT`（等待订单成交的超时时间，默认 `10` 秒）
+- `MAX_POSITION_VALUE`（持仓市值上限，达到后自动停止，例如 `500`）
 - `SMA_SHORT`/`SMA_LONG`（默认 `5/20`）
 - `SMA_QUOTE_PER_TRADE`（每次下单的报价币金额，默认 `50`）
+- `SMA_MIN_CROSS_DIFF_PCT`（SMA 交叉的最小差值百分比，用于避免假信号，默认 `0.5`）
+- `SMA_COOLDOWN_SECONDS`（每次交易后的冷却时间（秒），避免过度交易，默认 `300`）
 
 ### 运行回测（CSV Tick）
 
@@ -118,6 +123,8 @@ python3 run_backtest.py data/btc_usdt_ticks.csv BTC-USDT
 - `BT_START_CASH`（默认 `10000`）
 - `BT_MAX_NOTIONAL`（默认 `1e9`，基本不限制）
 - `BT_SMA_SHORT`/`BT_SMA_LONG`/`BT_QUOTE_PER_TRADE`
+- `BT_MIN_CROSS_DIFF_PCT`（SMA 交叉的最小差值百分比，默认 `0.5`）
+- `BT_COOLDOWN_SECONDS`（每次交易后的冷却时间（秒），默认 `300`）
 
 ### 架构扩展点
 

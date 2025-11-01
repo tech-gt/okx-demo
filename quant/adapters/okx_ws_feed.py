@@ -58,8 +58,16 @@ class OkxWsTickerFeed(MarketDataFeed):
 
         # Subscription confirmation or heartbeat
         event = msg.get("event")
-        if event in {"subscribe", "error"}:
-            self._logger.info(f"WS event: {msg}")
+        if event == "subscribe":
+            self._logger.info(f"Subscription confirmed: {msg.get('arg')}")
+            return
+        elif event == "error":
+            # Log errors, but don't spam for heartbeat issues
+            error_msg = msg.get("msg", "")
+            if "ping" in error_msg.lower():
+                self._logger.debug(f"Heartbeat error (ignore): {msg}")
+            else:
+                self._logger.warning(f"WS error: {msg}")
             return
         if msg.get("op") == "pong":
             return

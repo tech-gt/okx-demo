@@ -17,28 +17,32 @@ class PaperEngineConfig:
 
 
 class PaperEngine:
-    def __init__(self, strategy: Strategy, feed, broker: Broker, risk: RiskManager, dry_run: bool = False) -> None:
+    def __init__(self, strategy: Strategy, feed, broker: Broker, risk: RiskManager, dry_run: bool = False, 
+                 max_position_value: float | None = None) -> None:
         self._strategy = strategy
         self._feed = feed
         self._broker = broker
         self._risk = risk
         self._dry_run = dry_run
+        self._max_position_value = max_position_value  # Max total position value in quote currency
         self._logger = logging.getLogger(__name__)
 
     def run(self, duration_ticks: int | None = None) -> None:
         self._logger.info("Starting strategy...")
         self._strategy.on_start()
         tick_count = 0
+        latest_prices: dict[str, float] = {}  # Track latest prices for each instrument
         try:
             for tick in self._feed.stream():
-                self._logger.info(f"Tick #{tick_count + 1} {tick.inst_id} Price={tick.last:.2f}")
+                self._logger.info(f"Tick #{tick_count + 1} {tick.inst_id} Price={tick.last:.6f}")
+                latest_prices[tick.inst_id] = tick.last
                 
                 if hasattr(self._broker, "set_last_price"):
                     # paper broker uses last price for fills
                     self._broker.set_last_price(tick.inst_id, tick.last)  # type: ignore[attr-defined]
 
                 orders: List[Order] = list(self._strategy.on_tick(tick))
-                self._logger.info(f"Strategy generated {len(orders)} order(s)")
+                # self._logger.info(f"Strategy generated {len(orders)} order(s)")
                 
                 for order in orders:
                     ref_price = tick.last
@@ -69,10 +73,23 @@ class PaperEngine:
                             portfolio = self._broker.get_portfolio()
                             self._logger.info(f"Cash={portfolio.cash:.2f} Positions={len(portfolio.positions)}")
 
-                tick_count += 1
-                if duration_ticks is not None and tick_count >= duration_ticks:
-                    self._logger.info(f"Reached {duration_ticks} ticks, stopping...")
-                    break
+                # Check position value limit
+                if self._max_position_value is not None:
+                    portfolio = self._broker.get_portfolio()
+                    total_position_value = 0.0
+                    for inst_id, pos in portfolio.positions.items():
+                        if pos.quantity > 0:  # Only count long positions
+                            latest_price = latest_prices.get(inst_id, 0.0)
+                            total_position_value += pos.quantity * latest_price
+                    
+                    if total_position_value >= self._max_position_value:
+                        self._logger.info(f"Total position value {total_position_value:.2f} reached limit {self._max_position_value:.2f}, stopping...")
+                        break
+                
+                # tick_count += 1
+                # if duration_ticks is not None and tick_count >= duration_ticks:
+                #     self._logger.info(f"Reached {duration_ticks} ticks, stopping...")
+                #     break
         finally:
             self._logger.info("Stopping strategy...")
             try:

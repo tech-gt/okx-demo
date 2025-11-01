@@ -55,10 +55,21 @@ def main() -> None:
         short_window=int(os.getenv("SMA_SHORT", "5")),
         long_window=int(os.getenv("SMA_LONG", "20")),
         quote_per_trade=float(os.getenv("SMA_QUOTE_PER_TRADE", "50")),
+        min_cross_diff_pct=float(os.getenv("SMA_MIN_CROSS_DIFF_PCT", "0.5")),
+        cooldown_seconds=int(os.getenv("SMA_COOLDOWN_SECONDS", "300")),
     )
     strat = SmaCrossStrategy(inst_ids=inst_ids, cfg=sma_cfg)
 
-    engine = PaperEngine(strategy=strat, feed=feed, broker=broker, risk=risk, dry_run=dry_run)
+    # Get max position value from environment (in quote currency)
+    max_pos_val_str = os.getenv("MAX_POSITION_VALUE")
+    max_position_value = float(max_pos_val_str) if max_pos_val_str else None
+    
+    engine = PaperEngine(strategy=strat, feed=feed, broker=broker, risk=risk, dry_run=dry_run, 
+                         max_position_value=max_position_value)
+    
+    if max_position_value:
+        logger.info(f"Max position value: {max_position_value} USDT")
+    
     logger.info(f"Starting real trading engine with WebSocket feed [{mode_str}] {inst_ids}")
     engine.run(duration_ticks=duration_ticks)
 
