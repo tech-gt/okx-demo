@@ -42,7 +42,10 @@ class PaperEngine:
                 
                 for order in orders:
                     ref_price = tick.last
-                    self._logger.info(f"Processing order: {order.side} {order.inst_id} qty={order.quote_quantity}")
+                    if order.quote_quantity:
+                        self._logger.info(f"Processing order: {order.side} {order.inst_id} quote_qty={order.quote_quantity}")
+                    else:
+                        self._logger.info(f"Processing order: {order.side} {order.inst_id} base_qty={order.quantity}")
                     
                     if not self._risk.approve(order, self._broker.get_portfolio(), ref_price):
                         self._logger.warning(f"Order REJECTED: {order}")

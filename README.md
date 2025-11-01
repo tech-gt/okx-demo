@@ -39,6 +39,7 @@ python3 okx_demo.py
   - `okx_rest_feed.py` 基于 OKX REST 的简易轮询行情源（模拟盘友好）
   - `okx_ws_feed.py` 基于 OKX WebSocket 的实时行情源（低延迟）
   - `paper_broker.py` 简单模拟撮合，按最新价即时成交（含费率）
+  - `okx_broker.py` ⭐ **真实 OKX 交易所连接**（支持模拟盘和实盘）
   - `csv_feed.py` 用于回测的 CSV Tick 源（列：`ts,last[,bid,ask]`）
 - 引擎：`quant/engines/`
   - `paper_loop.py` 事件循环（策略 -> 风控 -> 模拟撮合 -> 组合）
@@ -78,6 +79,29 @@ python3 run_paper_ws.py
 **从 OKX 获取初始资金**：
 如果你想使用 OKX 账户的真实余额作为模拟盘初始资金，设置 `PAPER_USE_REAL_BALANCE=true` 并配置 `PAPER_BALANCE_CURRENCY=USDT`（或其他币种）。如果 API 查询失败，将回退到 `PAPER_START_CASH` 的默认值。
 
+### 运行真实 OKX 交易（OkxBroker）
+
+使用 `OkxBroker` 可以将策略直接连接到 OKX 交易所（支持模拟盘和实盘）：
+
+```
+python3 run_real_trading.py
+```
+
+⚠️ **重要安全提示**：
+- 默认使用 OKX 模拟盘（`OKX_SIMULATED=1`）
+- 切换到实盘需设置 `OKX_SIMULATED=0` 并在提示中输入 'YES' 确认
+- 实盘有资金风险，请谨慎操作
+
+环境变量：
+- `OKX_SIMULATED`（默认 `1`，模拟盘；设为 `0` 切换到实盘）
+- `OKX_REAL_INST_IDS`（默认 `DOGE-USDT`，交易品种）
+- `OKX_REAL_TICKS`（默认 `50`，运行多少个 tick）
+- `OKX_REAL_DRY_RUN`（默认 `false`，设为 `true` 只查看不实际下单）
+- `OKX_REAL_MAX_NOTIONAL`（单笔上限，默认 `200`）
+- `OKX_FILL_WAIT`（等待订单成交的超时时间，默认 `10` 秒）
+- `SMA_SHORT`/`SMA_LONG`（默认 `5/20`）
+- `SMA_QUOTE_PER_TRADE`（每次下单的报价币金额，默认 `50`）
+
 ### 运行回测（CSV Tick）
 
 ```
@@ -99,7 +123,7 @@ python3 run_backtest.py data/btc_usdt_ticks.csv BTC-USDT
 
 - 新策略：实现 `Strategy`，在 `on_tick` 输出 `Order`
 - 新产品：扩展 `Instrument`/下单规则，在 `Broker` 侧处理
-- 实盘接入：用 OKX 私有 WS/REST 替换 `PaperBroker`，保留相同 `Broker` 接口
+- 实盘接入：✅ 已完成！`OkxBroker` 已实现，支持 OKX 模拟盘和实盘
 
 运行后脚本会：
 - 查询服务器时间（`/api/v5/public/time`）
